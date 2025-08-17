@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Responsive Image Gallery — Lightbox + Filters</title>
+    <style>
+         :root {
+            --bg: #0b0d10;
+            --card: #12161b;
+            --muted: #9aa4b2;
+            --text: #e7edf3;
+            --accent: #4da3ff;
+            --accent-2: #7c4dff;
+            --ring: color-mix(in oklab, var(--accent), white 15%);
+            --radius: 18px;
+            --shadow: 0 10px 30px rgba(0, 0, 0, .3);
+        }
+        
+        * {
+            box-sizing: border-box
+        }
+        
+        html,
+        body {
+            height: 100%
+        }
+        
+        body {
+            margin: 0;
+            font: 500 16px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+            color: var(--text);
+            background: radial-gradient(1200px 800px at 80% -10%, #111524 0, transparent 35%), radial-gradient(1000px 600px at 10% -20%, #0f1730 0, transparent 30%), var(--bg);
+        }
+        
+        .container {
+            max-width: 1200px;
+            padding: 24px;
+            margin-inline: auto;
+        }
+        
+        header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            margin-block: 12px 20px;
+        }
+        
+        h1 {
+            font-size: clamp(1.2rem, 1rem + 2vw, 2rem);
+            margin: 0;
+            letter-spacing: 0.3px;
+        }
+        
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        
+        .btn {
+            appearance: none;
+            border: 0;
+            cursor: pointer;
+            padding: 10px 14px;
+            border-radius: 999px;
+            background: linear-gradient(180deg, #1b2330, #141a22);
+            color: var(--text);
+            box-shadow: inset 0 0 0 1px #232a34, 0 8px 20px rgba(0, 0, 0, .2);
+            transition: transform .15s ease, box-shadow .2s ease, background .2s ease, outline-color .2s ease;
+            outline: 2px solid transparent;
+            user-select: none;
+        }
+        
+        .btn:hover {
+            transform: translateY(-1px)
+        }
+        
+        .btn:focus-visible {
+            outline-color: var(--ring)
+        }
+        
+        .btn[data-active="true"] {
+            background: linear-gradient(180deg, color-mix(in oklab, var(--accent), #101620 65%), #131a22);
+            box-shadow: inset 0 0 0 1px var(--ring), 0 12px 24px rgba(0, 0, 0, .35);
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 14px;
+        }
+        
+        figure.card {
+            position: relative;
+            margin: 0;
+            overflow: hidden;
+            border-radius: var(--radius);
+            background: linear-gradient(180deg, #11161d, #0f1318);
+            box-shadow: var(--shadow);
+            aspect-ratio: 4 / 3;
+            isolation: isolate;
+            transition: transform .3s ease, box-shadow .3s ease;
+        }
+        
+        .card img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+            filter: saturate(1.05) contrast(1.02);
+            transition: transform .5s ease, filter .4s ease;
+            will-change: transform;
+        }
+        
+        .card:hover img {
+            transform: scale(1.05);
+            filter: saturate(1.2) contrast(1.05);
+        }
+        
+        .overlay {
+            position: absolute;
+            inset: 0;
+            display: grid;
+            place-items: end start;
+            padding: 12px;
+            background: linear-gradient(180deg, transparent 40%, rgba(0, 0, 0, .55));
+            opacity: 0;
+            transition: opacity .3s ease;
+        }
+        
+        .card:hover .overlay {
+            opacity: 1
+        }
+        
+        .tag {
+            font-size: .8rem;
+            padding: 6px 10px;
+            border-radius: 999px;
+            backdrop-filter: blur(4px);
+            background: color-mix(in oklab, var(--accent-2), black 65%);
+            color: white;
+            letter-spacing: .2px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, .35);
+        }
+        
+        .lightbox {
+            position: fixed;
+            inset: 0;
+            display: none;
+            place-items: center;
+            background: rgba(0, 0, 0, .8);
+            z-index: 100;
+            padding: 24px;
+        }
+        
+        .lightbox[aria-hidden="false"] {
+            display: grid;
+        }
+        
+        .lightbox-dialog {
+            position: relative;
+            width: min(100%, 1000px);
+            max-height: 90vh;
+            display: grid;
+            grid-template-rows: auto 1fr auto;
+            gap: 10px;
+            background: #0f1216;
+            border-radius: 20px;
+            box-shadow: var(--shadow);
+            overflow: hidden;
+            outline: 1px solid #1f2937;
+        }
+        
+        .lightbox-header,
+        .lightbox-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 12px;
+            background: linear-gradient(180deg, #0f141b, #0b0e12);
+        }
+        
+        .lightbox-title {
+            font-size: 1rem;
+            color: var(--muted)
+        }
+        
+        .lightbox-media {
+            position: relative;
+            display: grid;
+            place-items: center;
+            background: #0a0d11;
+            overflow: hidden;
+        }
+        
+        .lightbox-media img {
+            max-width: 100%;
+            max-height: 80vh;
+            object-fit: contain;
+            display: block;
+        }
+        
+        .icon-btn {
+            appearance: none;
+            border: 0;
+            background: #11161e;
+            color: var(--text);
+            border-radius: 12px;
+            padding: 10px;
+            cursor: pointer;
+            box-shadow: inset 0 0 0 1px #253042;
+            transition: transform .15s ease, background .2s ease, box-shadow .2s ease, outline-color .2s ease;
+            outline: 2px solid transparent;
+            display: inline-grid;
+            place-items: center;
+        }
+        
+        .icon-btn:hover {
+            transform: translateY(-1px);
+        }
+        
+        .icon-btn:focus-visible {
+            outline-color: var(--ring);
+        }
+        
+        .nav-btns {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .arrow {
+            width: 22px;
+            height: 22px;
+            display: block
+        }
+        
+        .close {
+            width: 18px;
+            height: 18px;
+            display: block
+        }
+        
+        .filters {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin: 16px 0 22px;
+        }
+        
+        @media (max-width:600px) {
+            .btn {
+                padding: 8px 12px;
+            }
+            .lightbox-dialog {
+                border-radius: 14px
+            }
+        }
+        
+        @media (prefers-reduced-motion: reduce) {
+            * {
+                transition: none !important;
+                animation: none !important
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>✨ Image Gallery</h1>
+            <div class="controls" role="group" aria-label="Gallery navigation">
+                <button class="btn" id="prevBtn" aria-label="Previous image">⟵ Prev</button>
+                <button class="btn" id="nextBtn" aria-label="Next image">Next ⟶</button>
+            </div>
+        </header>
+
+        <section class="filters" aria-label="Category filters">
+            <button class="btn filter" data-filter="all" data-active="true">All</button>
+            <button class="btn filter" data-filter="nature">Nature</button>
+            <button class="btn filter" data-filter="city">City</button>
+            <button class="btn filter" data-filter="people">People</button>
+            <button class="btn filter" data-filter="animals">Animals</button>
+        </section>
+
+        <main class="grid" id="gallery" aria-live="polite">
+
+            <!-- NATURE -->
+            <figure class="card" data-category="nature" data-index="0">
+                <img loading="lazy" src="2105066495_Mount Thullier.webp" alt="Mount Thullier" />
+                <figcaption class="overlay"><span class="tag">Nature</span></figcaption>
+            </figure>
+            <figure class="card" data-category="nature" data-index="1">
+                <img loading="lazy" src="james-naughton-beauty-render.jpg" alt="Forest with sunbeams" />
+                <figcaption class="overlay"><span class="tag">Nature</span></figcaption>
+            </figure>
+
+            <!-- CITY -->
+            <figure class="card" data-category="city" data-index="2">
+                <img loading="lazy" src="New_York_City_Skyline_at_Dusk.jpg" alt="City skyline" />
+                <figcaption class="overlay"><span class="tag">City</span></figcaption>
+            </figure>
+            <figure class="card" data-category="city" data-index="3">
+                <img loading="lazy" src="blog2.webp" alt="Street with neon signs" />
+                <figcaption class="overlay"><span class="tag">City</span></figcaption>
+            </figure>
+
+            <!-- PEOPLE -->
+            <figure class="card" data-category="people" data-index="4">
+                <img loading="lazy" src="https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=1200&q=60" alt="Portrait of a smiling woman" />
+                <figcaption class="overlay"><span class="tag">People</span></figcaption>
+            </figure>
+            <figure class="card" data-category="people" data-index="5">
+                <img loading="lazy" src="istockphoto-161057440-612x612.jpg" alt="Friends walking outdoors" />
+                <figcaption class="overlay"><span class="tag">People</span></figcaption>
+            </figure>
+
+            <!-- ANIMALS -->
+            <figure class="card" data-category="animals" data-index="6">
+                <img loading="lazy" src="https://images.unsplash.com/photo-1518791841217-8f162f1e1131?w=1200&q=60" alt="Cute kitten looking up" />
+                <figcaption class="overlay"><span class="tag">Animals</span></figcaption>
+            </figure>
+            <figure class="card" data-category="animals" data-index="7">
+                <img loading="lazy" src="White-horse-galloping-in-a-field.webp" alt="White horse galloping in field" />
+                <figcaption class="overlay"><span class="tag">Animals</span></figcaption>
+            </figure>
+
+            <!-- MIXED -->
+            <figure class="card" data-category="nature" data-index="8">
+                <img loading="lazy" src="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1200&q=60" alt="Ocean waves at sunrise" />
+                <figcaption class="overlay"><span class="tag">Nature</span></figcaption>
+            </figure>
+            <figure class="card" data-category="city" data-index="9">
+                <img loading="lazy" src="pexels-fox-58267-4532554.jpg" alt="Bridge with traffic lights" />
+                <figcaption class="overlay"><span class="tag">City</span></figcaption>
+            </figure>
+            <figure class="card" data-category="people" data-index="10">
+                <img loading="lazy" src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=1200&q=60" alt="Person with red dress" />
+                <figcaption class="overlay"><span class="tag">People</span></figcaption>
+            </figure>
+            <figure class="card" data-category="animals" data-index="11">
+                <img loading="lazy" src="closeup-shot-cute-european-robin-bird-swimming-lake_181624-12308.avif" alt="Bird on water" />
+                <figcaption class="overlay"><span class="tag">Animals</span></figcaption>
+            </figure>
+        </main>
+    </div>
+    <div class="lightbox" id="lightbox" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="lb-title">
+        <div class="lightbox-dialog">
+            <div class="lightbox-header">
+                <div class="lightbox-title" id="lb-title">Viewing image <span id="lb-count">1</span>/<span id="lb-total">12</span></div>
+                <div class="nav-btns">
+                    <button class="icon-btn" id="lb-prev" aria-label="Previous (←)">
+            <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+                    <button class="icon-btn" id="lb-next" aria-label="Next (→)">
+            <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
+                    <button class="icon-btn" id="lb-close" aria-label="Close (Esc)">
+            <svg class="close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+                </div>
+            </div>
+            <div class="lightbox-media">
+                <img id="lb-img" alt="Expanded gallery item" />
+            </div>
+            <div class="lightbox-footer">
+                <div id="lb-caption" class="lightbox-title">&nbsp;</div>
+                <div style="display:flex; gap:8px; align-items:center">
+                    <button class="btn" id="downloadBtn" aria-label="Open image in new tab">Open</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            const gallery = document.getElementById('gallery');
+            const cards = Array.from(gallery.querySelectorAll('.card'));
+            const filters = document.querySelectorAll('.filter');
+
+            const lightbox = document.getElementById('lightbox');
+            const lbImg = document.getElementById('lb-img');
+            const lbCaption = document.getElementById('lb-caption');
+            const lbCount = document.getElementById('lb-count');
+            const lbTotal = document.getElementById('lb-total');
+            const lbPrev = document.getElementById('lb-prev');
+            const lbNext = document.getElementById('lb-next');
+            const lbClose = document.getElementById('lb-close');
+
+            const prevBtn = document.getElementById('prevBtn');
+            const nextBtn = document.getElementById('nextBtn');
+
+            const downloadBtn = document.getElementById('downloadBtn');
+
+            let currentIndex = 0;
+
+            lbTotal.textContent = String(cards.length);
+
+            function openLightbox(index) {
+                currentIndex = index;
+                const card = cards[currentIndex];
+                const img = card.querySelector('img');
+                lbImg.src = img.src;
+                lbImg.alt = img.alt;
+                lbCaption.textContent = img.alt;
+                lbCount.textContent = String(currentIndex + 1);
+
+                downloadBtn.onclick = () => {
+                    window.open(img.src, '_blank');
+                };
+
+                lightbox.setAttribute('aria-hidden', 'false');
+                document.body.style.overflow = 'hidden';
+            }
+
+            function closeLightbox() {
+                lightbox.setAttribute('aria-hidden', 'true');
+                document.body.style.overflow = '';
+            }
+
+            function showNext() {
+                const start = currentIndex;
+                do {
+                    currentIndex = (currentIndex + 1) % cards.length;
+                }
+                while (cards[currentIndex].style.display === 'none' && currentIndex !== start);
+                updateLightbox();
+            }
+
+            function showPrev() {
+                const start = currentIndex;
+                do {
+                    currentIndex = (currentIndex - 1 + cards.length) % cards.length;
+                }
+                while (cards[currentIndex].style.display === 'none' && currentIndex !== start);
+                updateLightbox();
+            }
+
+            function updateLightbox() {
+                const card = cards[currentIndex];
+                const img = card.querySelector('img');
+                lbImg.src = img.src;
+                lbImg.alt = img.alt;
+                lbCaption.textContent = img.alt;
+                lbCount.textContent = String(currentIndex + 1);
+            }
+
+            cards.forEach(card => {
+                card.addEventListener('click', () => openLightbox(Number(card.dataset.index)));
+                card.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        openLightbox(Number(card.dataset.index));
+                    }
+                });
+                card.tabIndex = 0;
+                card.setAttribute('role', 'button');
+                card.setAttribute('aria-label', 'Open image');
+            });
+
+            lbNext.addEventListener('click', showNext);
+            lbPrev.addEventListener('click', showPrev);
+            lbClose.addEventListener('click', closeLightbox);
+
+            window.addEventListener('keydown', (e) => {
+                if (lightbox.getAttribute('aria-hidden') === 'true') return;
+                if (e.key === 'Escape') closeLightbox();
+                if (e.key === 'ArrowRight') showNext();
+                if (e.key === 'ArrowLeft') showPrev();
+            });
+
+            lightbox.addEventListener('click', (e) => {
+                if (e.target === lightbox) closeLightbox();
+            });
+
+            function getVisibleIndices() {
+                return cards
+                    .map((c, i) => ({
+                        el: c,
+                        i
+                    }))
+                    .filter(x => x.el.style.display !== 'none')
+                    .map(x => x.i);
+            }
+
+            prevBtn.addEventListener('click', () => {
+                const visible = getVisibleIndices();
+                const pos = visible.indexOf(currentIndex);
+                const nextPos = (pos - 1 + visible.length) % visible.length;
+                openLightbox(visible[nextPos]);
+            });
+            nextBtn.addEventListener('click', () => {
+                const visible = getVisibleIndices();
+                const pos = visible.indexOf(currentIndex);
+                const nextPos = (pos + 1) % visible.length;
+                openLightbox(visible[nextPos]);
+            });
+
+            filters.forEach(btn => btn.addEventListener('click', () => {
+                filters.forEach(b => b.dataset.active = 'false');
+                btn.dataset.active = 'true';
+                const f = btn.dataset.filter;
+                cards.forEach(card => {
+                    const match = (f === 'all') || card.dataset.category === f;
+                    card.style.display = match ? '' : 'none';
+                });
+
+                const firstVisible = cards.findIndex(c => c.style.display !== 'none');
+                if (firstVisible !== -1) {
+                    currentIndex = firstVisible;
+                }
+            }));
+
+            let touchStartX = 0;
+            lbImg.addEventListener('touchstart', (e) => {
+                touchStartX = e.changedTouches[0].clientX;
+            });
+            lbImg.addEventListener('touchend', (e) => {
+                const dx = e.changedTouches[0].clientX - touchStartX;
+                if (Math.abs(dx) > 40) {
+                    dx < 0 ? showNext() : showPrev();
+                }
+            });
+        })();
+    </script>
+</body>
+
+</html>
